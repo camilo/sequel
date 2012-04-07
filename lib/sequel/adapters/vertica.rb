@@ -34,12 +34,38 @@ module Sequel
       def supports_drop_table_if_exists?
         true
       end
+
+      def supports_transaction_isolation_levels?
+        true
+      end
+
+      def identifier_input_method_default
+        nil
+      end
+
+      def identifier_output_method_default
+        nil
+      end
+
+      def schema_parse_table(table_name, opts)
+        metadata_dataset.select(:column_name, 
+          :is_nullable.as(:allow_null),
+         (:column_default).as(:default),
+         (:data_type).as(:db_type)
+        ).filter(:table_name => table_name).from(:columns).map do |row|
+          row[:default] = nil if blank_object?(row[:default])
+          row[:type] = schema_column_type(row[:db_type])
+          row[:primary_key] = false
+          [row.delete(:column_name).to_sym, row]
+        end
+      end
     end
 
     class Dataset < Sequel::Dataset
       Database::DatasetClass = self
 
       def fetch_rows(sql)
+        execute(sql) { |row| yield row }
       end
     end
   end
