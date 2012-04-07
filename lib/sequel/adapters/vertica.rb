@@ -48,14 +48,17 @@ module Sequel
       end
 
       def schema_parse_table(table_name, opts)
+        # left join table_constrains and make pk true when 
+        # constrain name is C_PRIMARY
         metadata_dataset.select(:column_name, 
           :is_nullable.as(:allow_null),
          (:column_default).as(:default),
-         (:data_type).as(:db_type)
-        ).filter(:table_name => table_name).from(:columns).map do |row|
+         (:data_type).as(:db_type), :constraint_name
+        ).filter(:table_name => table_name).from(:columns).
+          left_outer_join(:table_constraints, :table_id => :table_id).map do |row|
           row[:default] = nil if blank_object?(row[:default])
           row[:type] = schema_column_type(row[:db_type])
-          row[:primary_key] = false
+          row[:primary_key] = row.delete(:constraint_name) == 'C_PRIMARY'
           [row.delete(:column_name).to_sym, row]
         end
       end
