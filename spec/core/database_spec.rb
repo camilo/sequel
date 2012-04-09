@@ -193,8 +193,7 @@ describe "A new Database" do
   end
 
   specify "should populate :adapter option when using connection string" do
-    Sequel::Database.should_receive(:adapter_class).once.with(:do).and_return(Sequel::Database)
-    Sequel.connect('do:test://host/db_name').opts[:adapter] == :do
+    Sequel.connect('mock:/').opts[:adapter].should == "mock"
   end
 end
 
@@ -1949,6 +1948,12 @@ describe "Database#schema_autoincrementing_primary_key?" do
     m = Sequel::Database.new.method(:schema_autoincrementing_primary_key?)
     m.call(:primary_key=>true).should == true
     m.call(:primary_key=>false).should == false
+  end
+end
+
+describe "Database#supports_transactional_ddl?" do
+  specify "should be false by default" do
+    Sequel::Database.new.supports_transactional_ddl?.should == false
   end
 end
 

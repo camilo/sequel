@@ -72,6 +72,11 @@ module Sequel
         true
       end
 
+      # MSSQL supports transaction DDL statements.
+      def supports_transactional_ddl?
+        true
+      end
+
       # Microsoft SQL Server supports using the INFORMATION_SCHEMA to get
       # information on tables.
       def tables(opts={})
@@ -325,12 +330,16 @@ module Sequel
       OUTPUT_INSERTED = " OUTPUT INSERTED.*".freeze
       HEX_START = '0x'.freeze
       UNICODE_STRING_START = "N'".freeze
+      BACKSLASH_CRLF_RE = /\\((?:\r\n)|\n)/.freeze
+      BACKSLASH_CRLF_REPLACE = '\\\\\\\\\\1\\1'.freeze
       TOP_PAREN = " TOP (".freeze
       TOP = " TOP ".freeze
       OUTPUT = " OUTPUT ".freeze
       HSTAR = "H*".freeze
       CASE_SENSITIVE_COLLATION = 'Latin1_General_CS_AS'.freeze
       CASE_INSENSITIVE_COLLATION = 'Latin1_General_CI_AS'.freeze
+      DEFAULT_TIMESTAMP_FORMAT = "'%Y-%m-%dT%H:%M:%S%N%z'".freeze
+      FORMAT_DATE = "'%Y%m%d'".freeze
 
       # Allow overriding of the mssql_unicode_strings option at the dataset level.
       attr_accessor :mssql_unicode_strings
@@ -557,6 +566,13 @@ module Sequel
         server_version >= 10000000
       end
 
+      # Use strict ISO-8601 format with T between date and time,
+      # since that is the format that is multilanguage and not
+      # DATEFORMAT dependent.
+      def default_timestamp_format
+        DEFAULT_TIMESTAMP_FORMAT
+      end
+
       # MSSQL supports the OUTPUT clause for DELETE statements.
       # It also allows prepending a WITH clause.
       def delete_clause_methods
@@ -612,18 +628,24 @@ module Sequel
         sql << HEX_START << v.unpack(HSTAR).first
       end
       
-      # Optionally use unicode string syntax for all strings. Don't double
-      # backslashes.
-      def literal_string_append(sql, v)
-        sql << (mssql_unicode_strings ? UNICODE_STRING_START : APOS)
-        sql << v.gsub(APOS_RE, DOUBLE_APOS) << APOS
+      # Use YYYYmmdd format, since that's the only want that is
+      # multilanguage and not DATEFORMAT dependent.
+      def literal_date(v)
+        v.strftime(FORMAT_DATE)
       end
-      
+
       # Use 0 for false on MSSQL
       def literal_false
         BOOL_FALSE
       end
 
+      # Optionally use unicode string syntax for all strings. Don't double
+      # backslashes.
+      def literal_string_append(sql, v)
+        sql << (mssql_unicode_strings ? UNICODE_STRING_START : APOS)
+        sql << v.gsub(APOS_RE, DOUBLE_APOS).gsub(BACKSLASH_CRLF_RE, BACKSLASH_CRLF_REPLACE) << APOS
+      end
+      
       # Use 1 for true on MSSQL
       def literal_true
         BOOL_TRUE
