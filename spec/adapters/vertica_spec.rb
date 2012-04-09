@@ -42,3 +42,66 @@ describe "A Vertica database" do
   end
 
 end
+
+describe "A vertica dataset" do
+  before do
+    @d = VERTICA_DB[:test]
+    @d.delete if @d.count > 0 # Vertica will throw an error if the table has just been created and does not have a super projection yet.
+  end
+
+  specify "should quote columns and tables using double quotes if quoting identifiers" do
+    @d.select(:name).sql.should == \
+      'SELECT "name" FROM "test"'
+
+    @d.select('COUNT(*)'.lit).sql.should == \
+      'SELECT COUNT(*) FROM "test"'
+
+    @d.select(:max.sql_function(:value)).sql.should == \
+      'SELECT max("value") FROM "test"'
+
+    @d.select(:NOW.sql_function).sql.should == \
+    'SELECT NOW() FROM "test"'
+
+    @d.select(:max.sql_function(:items__value)).sql.should == \
+      'SELECT max("items"."value") FROM "test"'
+
+    @d.order(:name.desc).sql.should == \
+      'SELECT * FROM "test" ORDER BY "name" DESC'
+
+    @d.select('test.name AS item_name'.lit).sql.should == \
+      'SELECT test.name AS item_name FROM "test"'
+
+    @d.select('"name"'.lit).sql.should == \
+      'SELECT "name" FROM "test"'
+
+    @d.select('max(test."name") AS "max_name"'.lit).sql.should == \
+      'SELECT max(test."name") AS "max_name" FROM "test"'
+
+    @d.insert_sql(:x => :y).should =~ \
+      /\AINSERT INTO "test" \("x"\) VALUES \("y"\)( RETURNING NULL)?\z/
+
+  end
+
+  specify "should quote fields correctly when reversing the order if quoting identifiers" do
+    @d.reverse_order(:name).sql.should == \
+      'SELECT * FROM "test" ORDER BY "name" DESC'
+
+    @d.reverse_order(:name.desc).sql.should == \
+      'SELECT * FROM "test" ORDER BY "name" ASC'
+
+    @d.reverse_order(:name, :test.desc).sql.should == \
+      'SELECT * FROM "test" ORDER BY "name" DESC, "test" ASC'
+
+    @d.reverse_order(:name.desc, :test).sql.should == \
+      'SELECT * FROM "test" ORDER BY "name" ASC, "test" DESC'
+  end
+
+  specify "should support regexps" do
+    @d << {:name => 'abc', :value => 1}
+    @d << {:name => 'bcd', :value => 2}
+
+    @d.filter(:name => /bc/).count.should == 2
+    @d.filter(:name => /^bc/).count.should == 1
+  end
+
+end

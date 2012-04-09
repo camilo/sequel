@@ -3,6 +3,8 @@ require 'vertica'
 module Sequel
   module Vertica
     class Database < Sequel::Database
+      ::Vertica::Connection.send(:alias_method,:execute, :query)
+      PK_NAME = 'C_PRIMARY'
       set_adapter_scheme :vertica
 
       def initialize(opts={})
@@ -23,9 +25,13 @@ module Sequel
 
       def execute(sql, opts={}, &block)
         synchronize(opts[:server]) do |conn|
-          conn.query(sql, &block)
+          res = conn.query(sql)
+          res.each(&block)
         end
       end
+
+      alias_method :execute_insert, :execute
+      alias_method :execute_dui, :execute
 
       def supports_create_table_if_not_exists?
         true
@@ -48,17 +54,16 @@ module Sequel
       end
 
       def schema_parse_table(table_name, opts)
-        # left join table_constrains and make pk true when 
-        # constrain name is C_PRIMARY
-        metadata_dataset.select(:column_name, 
-          :is_nullable.as(:allow_null),
-         (:column_default).as(:default),
-         (:data_type).as(:db_type), :constraint_name
-        ).filter(:table_name => table_name).from(:columns).
-          left_outer_join(:table_constraints, :table_id => :table_id).map do |row|
+        selector = [:column_name, :constraint_name, :is_nullable.as(:allow_null), 
+                    (:column_default).as(:default), (:data_type).as(:db_type)]
+
+        dataset = metadata_dataset.select(*selector).filter(:table_name => table_name).
+          from(:columns).left_outer_join(:table_constraints, :table_id => :table_id)
+        
+        dataset.map do |row|
           row[:default] = nil if blank_object?(row[:default])
           row[:type] = schema_column_type(row[:db_type])
-          row[:primary_key] = row.delete(:constraint_name) == 'C_PRIMARY'
+          row[:primary_key] = row.delete(:constraint_name) == PK_NAME
           [row.delete(:column_name).to_sym, row]
         end
       end
@@ -70,6 +75,7 @@ module Sequel
       def fetch_rows(sql)
         execute(sql) { |row| yield row }
       end
+
     end
   end
 end
