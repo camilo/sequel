@@ -135,4 +135,12 @@ describe "A Vertica dataset with a timestamp field" do
     (t2.is_a?(Time) ? t2.usec : t2.strftime('%N').to_i/1000).should == t.strftime('%N').to_i/1000
   end
 
+  describe "Verticas's EXPLAIN and EXPLAIN LOCAL" do
+    specify "should not raise errors" do
+      @d = VERTICA_DB[:test3]
+      proc{@d.explain}.should_not raise_error
+      proc{@d.explain(local: true)}.should_not raise_error
+    end
+  end
+
 end

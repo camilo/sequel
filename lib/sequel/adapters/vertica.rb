@@ -68,9 +68,16 @@ module Sequel
 
     class Dataset < Sequel::Dataset
       Database::DatasetClass = self
+      EXPLAIN = 'EXPLAIN '
+      EXPLAIN_LOCAL = 'EXPLAIN LOCAL '
+      QUERY_PLAN = 'QUERY PLAN' 
 
       def fetch_rows(sql)
         execute(sql) { |row| yield row }
+      end
+
+      def explain(opts={})
+        execute((opts[:local] ? EXPLAIN_LOCAL : EXPLAIN) + select_sql).map{ |k, v| k == QUERY_PLAN }.join("\$")
       end
     end
   end
