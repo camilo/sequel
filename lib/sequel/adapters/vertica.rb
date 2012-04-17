@@ -7,10 +7,6 @@ module Sequel
       PK_NAME = 'C_PRIMARY'
       set_adapter_scheme :vertica
 
-      def initialize(opts={})
-        super
-      end
-
       def connect(server)
         opts = server_opts(server)
         ::Vertica::Connection.new(
@@ -67,6 +63,7 @@ module Sequel
           [row.delete(:column_name).to_sym, row]
         end
       end
+
     end
 
     class Dataset < Sequel::Dataset
@@ -75,7 +72,6 @@ module Sequel
       def fetch_rows(sql)
         execute(sql) { |row| yield row }
       end
-
     end
   end
 end

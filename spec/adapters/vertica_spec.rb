@@ -105,3 +105,34 @@ describe "A vertica dataset" do
   end
 
 end
+
+
+describe "A Vertica dataset with a timestamp field" do
+  before do
+    @db = VERTICA_DB
+    @d = @db[:test3]
+    @d.delete if @d.count > 0 # Vertica will throw an error if the table has just been created and does not have a super projection yet.
+  end
+  after do
+    @db.convert_infinite_timestamps = false if @db.adapter_scheme == :postgres
+  end
+
+  cspecify "should store milliseconds in time fields for Time objects", :do, :swift do
+    t = Time.now
+    @d << {:value=>1, :time=>t}
+    t2 = @d[:value =>1][:time]
+    @d.literal(t2).should == @d.literal(t)
+    t2.strftime('%Y-%m-%d %H:%M:%S').should == t.strftime('%Y-%m-%d %H:%M:%S')
+    (t2.is_a?(Time) ? t2.usec : t2.strftime('%N').to_i/1000).should == t.usec
+  end
+
+  cspecify "should store milliseconds in time fields for DateTime objects", :do, :swift do
+    t = DateTime.now
+    @d << {:value=>1, :time=>t}
+    t2 = @d[:value =>1][:time]
+    @d.literal(t2).should == @d.literal(t)
+    t2.strftime('%Y-%m-%d %H:%M:%S').should == t.strftime('%Y-%m-%d %H:%M:%S')
+    (t2.is_a?(Time) ? t2.usec : t2.strftime('%N').to_i/1000).should == t.strftime('%N').to_i/1000
+  end
+
+end
