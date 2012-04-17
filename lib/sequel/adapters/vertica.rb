@@ -73,7 +73,10 @@ module Sequel
       QUERY_PLAN = 'QUERY PLAN' 
 
       def fetch_rows(sql)
-        execute(sql) { |row| yield row }
+        execute(sql) do  |row| 
+          @columns ||= row.keys 
+          yield row 
+        end
       end
 
       def explain(opts={})
