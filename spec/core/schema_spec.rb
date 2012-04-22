@@ -287,12 +287,27 @@ describe "DB#create_table" do
     @db.sqls.should == ["CREATE TABLE cats (id integer)", "CREATE INDEX cats_id_index ON cats (id)"]
   end
   
+  specify "should accept inline index definition with a hash of options" do
+    @db.create_table(:cats) do
+      integer :id, :index => {:unique=>true}
+    end
+    @db.sqls.should == ["CREATE TABLE cats (id integer)", "CREATE UNIQUE INDEX cats_id_index ON cats (id)"]
+  end
+  
   specify "should accept inline index definition for foreign keys" do
     @db.create_table(:cats) do
       foreign_key :project_id, :table => :projects, :on_delete => :cascade, :index => true
     end
     @db.sqls.should == ["CREATE TABLE cats (project_id integer REFERENCES projects ON DELETE CASCADE)",
       "CREATE INDEX cats_project_id_index ON cats (project_id)"]
+  end
+  
+  specify "should accept inline index definition for foreign keys with a hash of options" do
+    @db.create_table(:cats) do
+      foreign_key :project_id, :table => :projects, :on_delete => :cascade, :index => {:unique=>true}
+    end
+    @db.sqls.should == ["CREATE TABLE cats (project_id integer REFERENCES projects ON DELETE CASCADE)",
+      "CREATE UNIQUE INDEX cats_project_id_index ON cats (project_id)"]
   end
   
   specify "should accept index definitions" do
@@ -534,6 +549,20 @@ describe "DB#create_table" do
       foreign_key [:a, :b], :abc, :key => [:x, :y], :on_delete => :set_null, :on_update => :set_null
     end
     @db.sqls.should == ["CREATE TABLE cats (a integer, b integer, FOREIGN KEY (a, b) REFERENCES abc(x, y) ON DELETE SET NULL ON UPDATE SET NULL)"]
+  end
+
+  specify "should accept an :as option to create a table from the results of a dataset" do
+    @db.create_table(:cats, :as=>@db[:a])
+    @db.sqls.should == ['CREATE TABLE cats AS SELECT * FROM a']
+  end
+
+  specify "should accept an :as option to create a table from a SELECT string" do
+    @db.create_table(:cats, :as=>'SELECT * FROM a')
+    @db.sqls.should == ['CREATE TABLE cats AS SELECT * FROM a']
+  end
+
+  specify "should raise an Error if both a block and an :as argument are given" do
+    proc{@db.create_table(:cats, :as=>@db[:a]){}}.should raise_error(Sequel::Error)
   end
 end
 
@@ -1153,6 +1182,28 @@ describe "Schema Parser" do
       []
     end
     proc{@db.schema(:x)}.should raise_error(Sequel::Error)
+  end
+
+  specify "should cache data by default" do
+    @db.meta_def(:schema_parse_table) do |t, opts|
+      [[:a, {}]]
+    end
+    @db.schema(:x).should equal(@db.schema(:x))
+  end
+
+  specify "should not cache data if :reload=>true is given" do
+    @db.meta_def(:schema_parse_table) do |t, opts|
+      [[:a, {}]]
+    end
+    @db.schema(:x).should_not equal(@db.schema(:x, :reload=>true))
+  end
+
+  specify "should not cache schema metadata if cache_schema is false" do
+    @db.cache_schema = false
+    @db.meta_def(:schema_parse_table) do |t, opts|
+      [[:a, {}]]
+    end
+    @db.schema(:x).should_not equal(@db.schema(:x))
   end
 
   specify "should provide options if given a table name" do
