@@ -162,25 +162,26 @@ describe "A Vertica database" do
     @db[:test2].first[:xyz].should == '000'
 
     @db[:test2].columns.should == [:name, :value, :xyz]
-    proc{ @db.drop_column :test2, :xyz }.should_raise Vertica::Error::QueryError, 'Vertica does not support removing columns'
-
-    @db[:test2].columns.should == [:name, :value]
-
-    @db[:test2].delete
-    @db.add_column :test2, :xyz, :varchar, :default => '000'
-    @db[:test2] << {:name => 'mmm', :value => 111, :xyz => 'qqqq'}
+    ->{ @db.drop_column :test2, :xyz }.should raise_error(Vertica::Error::QueryError,
+                                                    /ALTER TABLE DROP COLUMN not supported/)
 
     @db[:test2].columns.should == [:name, :value, :xyz]
+
+    @db[:test2].delete
+    @db.add_column :test2, :xyz2, :varchar, :default => '000'
+    @db[:test2] << {:name => 'mmm', :value => 111, :xyz2 => 'qqqq'}
+
+    @db[:test2].columns.should == [:name, :value, :xyz, :xyz2]
     @db.rename_column :test2, :xyz, :zyx
-    @db[:test2].columns.should == [:name, :value, :zyx]
-    @db[:test2].first[:zyx].should == 'qqqq'
+    @db[:test2].columns.should == [:name, :value, :zyx, :xyz2]
+    @db[:test2].first[:xyz2].should == 'qqqq'
 
     @db.add_column :test2, :xyz, :float
     @db[:test2].delete
     @db[:test2] << {:name => 'mmm', :value => 111, :xyz => 56.78}
-    @db.set_column_type :test2, :xyz, :integer
 
-    @db[:test2].first[:xyz].should == 57
+    ->{ @db.set_column_type :test2, :xyz, :integer }.should raise_error(Vertica::Error::QueryError,
+                                                    /ALTER TABLE ALTER COLUMN not supported/)
   end
 
 end
