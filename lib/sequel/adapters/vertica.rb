@@ -19,14 +19,18 @@ module Sequel
           :ssl => opts[:ssl] )
       end
 
-      def execute(sql, opts={}, &block)
+      def execute(sql, opts = {}, &block)
         synchronize(opts[:server]) do |conn|
           res = conn.query(sql)
           res.each(&block)
         end
       end
 
-      alias_method :execute_insert, :execute
+      def execute_insert(sql, opts = {}, &block)
+        result = execute(sql, opts, &block)
+        result.first[:OUTPUT]
+      end
+
       alias_method :execute_dui, :execute
 
       def supports_create_table_if_not_exists?
@@ -47,6 +51,10 @@ module Sequel
 
       def identifier_output_method_default
         nil
+      end
+
+      def locks
+        dataset.from(:v_monitor__locks)
       end
 
       def schema_parse_table(table_name, opts)
