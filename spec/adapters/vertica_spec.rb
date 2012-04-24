@@ -6,6 +6,10 @@ unless defined?(VERTICA_DB)
 end
 INTEGRATION_DB = VERTICA_DB unless defined?(INTEGRATION_DB)
 
+def VERTICA_DB.sqls
+  (@sqls ||= [])
+end
+
 
 VERTICA_DB.create_table! :test do
   varchar :name
@@ -184,4 +188,33 @@ describe "A Vertica database" do
                                                     /ALTER TABLE ALTER COLUMN not supported/)
   end
 
+  specify "#locks should be a dataset returning database locks " do
+    @db.locks.should be_a_kind_of(Sequel::Dataset)
+    @db.locks.all.should be_a_kind_of(Array)
+  end
 end
+
+describe "Vertica::Dataset#insert" do
+  before do
+    @db = VERTICA_DB
+    @db.create_table!(:test5){ :xid; Integer :value}
+    @db.sqls.clear
+    @ds = @db[:test5]
+  end
+
+  after do
+    @db.drop_table?(:test5)
+  end
+
+  specify "should work with static SQL" do
+    @ds.with_sql('INSERT INTO test5 (value) VALUES (10)').insert.should == 1
+    @db['INSERT INTO test5 (value) VALUES (20)'].insert.should == 1
+    @ds.all.should == [{:value=>10}, {:value=>20}]
+  end
+
+  specify "should insert correctly if using a column array and a value array" do
+    @ds.insert([:value], [10]).should == 1
+    @ds.all.should == [{:value=>10}]
+  end
+end
+
