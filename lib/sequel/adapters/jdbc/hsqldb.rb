@@ -47,6 +47,11 @@ module Sequel
           end
         end
 
+        # HSQLDB requires parens around the SELECT, and the WITH DATA syntax.
+        def create_table_as_sql(name, sql, options)
+          "#{create_table_prefix_sql(name, options)} AS (#{sql}) WITH DATA"
+        end
+
         # Use IDENTITY() to get the last inserted id.
         def last_insert_id(conn, opts={})
           statement(conn) do |stmt|
@@ -112,6 +117,8 @@ module Sequel
             sql << complex_expression_arg_pairs(args){|a, b| "(#{literal(a)} * POWER(2, #{literal(b)}))"}
           when :>>
             sql << complex_expression_arg_pairs(args){|a, b| "(#{literal(a)} / POWER(2, #{literal(b)}))"}
+          when :%
+            sql << complex_expression_arg_pairs(args){|a, b| "MOD(#{literal(a)}, #{literal(b)})"}
           when :'B~'
             sql << BITCOMP_OPEN
             literal_append(sql, args.at(0))

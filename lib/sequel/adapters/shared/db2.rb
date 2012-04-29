@@ -131,12 +131,24 @@ module Sequel
         super
       end
 
+      # Insert data from the current table into the new table after
+      # creating the table, since it is not possible to do it in one step.
+      def create_table_as(name, sql, options)
+        super
+        from(name).insert(sql.is_a?(Dataset) ? sql : dataset.with_sql(sql))
+      end
+
+      # DB2 requires parens around the SELECT, and DEFINITION ONLY at the end.
+      def create_table_as_sql(name, sql, options)
+        "#{create_table_prefix_sql(name, options)} AS (#{sql}) DEFINITION ONLY"
+      end
+
       # Here we use DGTT which has most backward compatibility, which uses
       # DECLARE instead of CREATE. CGTT can only be used after version 9.7.
       # http://www.ibm.com/developerworks/data/library/techarticle/dm-0912globaltemptable/
-      def create_table_sql(name, generator, options)
+      def create_table_prefix_sql(name, options)
         if options[:temp]
-          "DECLARE GLOBAL TEMPORARY TABLE #{quote_identifier(name)} (#{column_list_sql(generator)})"
+          "DECLARE GLOBAL TEMPORARY TABLE #{quote_identifier(name)}"
         else
           super
         end
@@ -221,6 +233,8 @@ module Sequel
           sql << complex_expression_arg_pairs(args){|a, b| "(#{literal(a)} * POWER(2, #{literal(b)}))"}
         when :>>
           sql << complex_expression_arg_pairs(args){|a, b| "(#{literal(a)} / POWER(2, #{literal(b)}))"}
+        when :%
+          sql << complex_expression_arg_pairs(args){|a, b| "MOD(#{literal(a)}, #{literal(b)})"}
         when :'B~'
           literal_append(sql, SQL::Function.new(:BITNOT, *args))
         when :extract

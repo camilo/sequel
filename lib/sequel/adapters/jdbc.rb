@@ -317,7 +317,7 @@ module Sequel
       # Yield the native prepared statements hash for the given connection
       # to the block in a thread-safe manner.
       def cps_sync(conn, &block)
-        @connection_prepared_statements_mutex.synchronize{yield (@connection_prepared_statements[conn] ||= {})}
+        @connection_prepared_statements_mutex.synchronize{yield(@connection_prepared_statements[conn] ||= {})}
       end
 
       # Close given adapter connections, and delete any related prepared statements.
@@ -345,7 +345,7 @@ module Sequel
           ps = name
           name = ps.prepared_statement_name
         else
-          ps = prepared_statements[name]
+          ps = prepared_statement(name)
         end
         sql = ps.prepared_sql
         synchronize(opts[:server]) do |conn|
@@ -612,7 +612,7 @@ module Sequel
         ps.extend(PreparedStatementMethods)
         if name
           ps.prepared_statement_name = name
-          db.prepared_statements[name] = ps
+          db.set_prepared_statement(name, ps)
         end
         ps
       end
