@@ -218,3 +218,67 @@ describe "Vertica::Dataset#insert" do
   end
 end
 
+describe "Vertica::Database schema qualified tables" do
+  before do
+    VERTICA_DB << "CREATE SCHEMA schema_test"
+    VERTICA_DB.instance_variable_set(:@primary_keys, {})
+    VERTICA_DB.instance_variable_set(:@primary_key_sequences, {})
+  end
+
+  after do
+    VERTICA_DB << "DROP SCHEMA schema_test CASCADE"
+    VERTICA_DB.default_schema = nil
+  end
+
+  specify "should be able to create, drop, select and insert into tables in a given schema" do
+    VERTICA_DB.create_table(:schema_test__table_in_schema_test){integer :i}
+    VERTICA_DB[:schema_test__table_in_schema_test].first.should == nil
+    VERTICA_DB[:schema_test__table_in_schema_test].insert(:i=>1).should == 1
+    VERTICA_DB[:schema_test__table_in_schema_test].first.should == {:i=>1}
+    VERTICA_DB.from('schema_test.table_in_schema_test'.lit).first.should == {:i=>1}
+    VERTICA_DB.drop_table(:schema_test__table_in_schema_test)
+    VERTICA_DB.create_table(:table_in_schema_test.qualify(:schema_test)){integer :i}
+    VERTICA_DB[:schema_test__table_in_schema_test].first.should == nil
+    VERTICA_DB.from('schema_test.table_in_schema_test'.lit).first.should == nil
+    VERTICA_DB.drop_table(:table_in_schema_test.qualify(:schema_test))
+  end
+
+  specify "#tables should not include tables in a default non-public schema" do
+    VERTICA_DB.create_table(:schema_test__table_in_schema_test){integer :i}
+    VERTICA_DB.tables.should include(:table_in_schema_test)
+    VERTICA_DB.tables.should_not include(:tables)
+    VERTICA_DB.tables.should_not include(:columns)
+    VERTICA_DB.tables.should_not include(:locks)
+    VERTICA_DB.tables.should_not include(:domain_udt_usage)
+  end
+
+  specify "#tables should return tables in the schema provided by the :schema argument" do
+    VERTICA_DB.create_table(:schema_test__table_in_schema_test){integer :i}
+    VERTICA_DB.tables(:schema=>:schema_test).should == [:table_in_schema_test]
+  end
+
+  specify "#schema should not include columns from tables in a default non-public schema" do
+    VERTICA_DB.create_table(:schema_test__domains){integer :i}
+    sch = VERTICA_DB.schema(:domains)
+    cs = sch.map{|x| x.first}
+    cs.should include(:i)
+    cs.should_not include(:data_type)
+  end
+
+  specify "#schema should only include columns from the table in the given :schema argument" do
+    VERTICA_DB.create_table!(:domains){integer :d}
+    VERTICA_DB.create_table(:schema_test__domains){integer :i}
+    sch = VERTICA_DB.schema(:domains, :schema=>:schema_test)
+    cs = sch.map{|x| x.first}
+    cs.should include(:i)
+    cs.should_not include(:d)
+    VERTICA_DB.drop_table(:domains)
+  end
+
+
+  specify "#table_exists? should see if the table is in a given schema" do
+    VERTICA_DB.create_table(:schema_test__schema_test){integer :i}
+    VERTICA_DB.table_exists?(:schema_test__schema_test).should == true
+  end
+
+end

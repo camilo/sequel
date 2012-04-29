@@ -57,12 +57,28 @@ module Sequel
         dataset.from(:v_monitor__locks)
       end
 
-      def schema_parse_table(table_name, opts)
+      def tables(options = {} )
+        schema = options[:schema]
+        filter = {}
+        filter[:table_schema] = schema.to_s if schema
+
+        ds = dataset.select(:table_name).from(:v_catalog__tables).
+          filter(filter)
+
+        ds.to_a.map{ |h| h[:table_name].to_sym }
+      end
+
+      def schema_parse_table(table_name, options = {})
+        schema = options[:schema]
+
         selector = [:column_name, :constraint_name, :is_nullable.as(:allow_null), 
                     (:column_default).as(:default), (:data_type).as(:db_type)]
+        filter = { :table_name => table_name }
+        filter [:table_schema] = schema.to_s if schema
 
-        dataset = metadata_dataset.select(*selector).filter(:table_name => table_name).
-          from(:columns).left_outer_join(:table_constraints, :table_id => :table_id)
+        dataset = metadata_dataset.select(*selector).filter(filter).
+          from(:v_catalog__columns).left_outer_join(:v_catalog__table_constraints, 
+                                                    :table_id => :table_id)
         
         dataset.map do |row|
           row[:default] = nil if blank_object?(row[:default])
